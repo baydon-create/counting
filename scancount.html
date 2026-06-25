@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ScanCount — Pharmacy Inventory</title>
+<script src="https://unpkg.com/@zxing/library@0.21.0/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0a0c10; --panel:#12151b; --panel2:#171b22; --border:#232934;
+    --text:#eef1f5; --sub:#8b94a3; --accent:#4fd1c5; --accent2:#38b8ac;
+    --danger:#ef5c5c; --warn:#e8b84b; --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; padding-bottom:90px;
+  }
+  .app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+  header{
+    padding:18px 20px 14px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0;
+    background:rgba(10,12,16,0.92); backdrop-filter:blur(10px); z-index:20;
+  }
+  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:0.2px;}
+  header h1 span{color:var(--accent);}
+  .staffchip{
+    font-size:12px; color:var(--sub); background:var(--panel2); border:1px solid var(--border);
+    padding:5px 10px; border-radius:20px; display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--accent);}
+
+  /* ---- PIN screen ---- */
+  .pinscreen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px;}
+  .pinscreen h2{font-size:20px; margin-bottom:4px;}
+  .pinscreen p{color:var(--sub); font-size:13px; margin-top:0; margin-bottom:24px;}
+  .pindots{display:flex; gap:14px; margin-bottom:28px;}
+  .pindots .pd{width:14px; height:14px; border-radius:50%; border:2px solid var(--border); transition:0.15s;}
+  .pindots .pd.filled{background:var(--accent); border-color:var(--accent);}
+  .keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; width:100%; max-width:300px;}
+  .keypad button{
+    aspect-ratio:1; border-radius:50%; border:1px solid var(--border); background:var(--panel2);
+    color:var(--text); font-size:22px; font-weight:600;
+  }
+  .keypad button:active{background:var(--accent); border-color:var(--accent); color:#06201d;}
+  .keypad .ghost{background:transparent; border:none;}
+  .pinerr{color:var(--danger); font-size:13px; height:18px; margin-bottom:6px;}
+
+  /* ---- main views ---- */
+  main{flex:1; padding:16px 16px 0;}
+  .tabs{display:flex; gap:8px; padding:0 16px 12px; position:sticky; top:64px; background:var(--bg); z-index:15;}
+  .tab{flex:1; text-align:center; padding:9px 0; border-radius:10px; font-size:13px; font-weight:600; color:var(--sub); border:1px solid var(--border); background:var(--panel2);}
+  .tab.active{color:#06201d; background:var(--accent); border-color:var(--accent);}
+
+  .scanbtn{
+    width:100%; padding:18px; border-radius:var(--radius); border:1px solid var(--accent);
+    background:linear-gradient(180deg, rgba(79,209,197,0.16), rgba(79,209,197,0.05));
+    color:var(--accent); font-size:16px; font-weight:700; display:flex; align-items:center;
+    justify-content:center; gap:10px; margin-bottom:16px;
+  }
+  .scanbtn svg{width:22px; height:22px;}
+
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px;}
+  .row{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .medname{font-weight:700; font-size:15px;}
+  .pid{color:var(--sub); font-size:11px; font-weight:600; margin-top:2px;}
+  .qty{font-size:20px; font-weight:800; color:var(--accent);}
+  .meta{color:var(--sub); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
+  .meta .exp.soon{color:var(--warn); font-weight:600;}
+  .meta .exp.expired{color:var(--danger); font-weight:600;}
+
+  .empty{text-align:center; color:var(--sub); padding:50px 20px; font-size:14px;}
+  .searchbar{
+    width:100%; padding:11px 14px; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:14px; margin-bottom:12px;
+  }
+  .searchbar::placeholder{color:#5a6372;}
+
+  /* ---- scanner overlay ---- */
+  .scanner{position:fixed; inset:0; background:#000; z-index:100; display:flex; flex-direction:column;}
+  .scanner video{flex:1; width:100%; object-fit:cover;}
+  .scanner-frame{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:78%; max-width:340px; aspect-ratio:1; border:2px solid var(--accent); border-radius:18px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,0.45);
+  }
+  .scanner-top{position:absolute; top:0; left:0; right:0; padding:18px; display:flex; justify-content:space-between; align-items:center; z-index:5;}
+  .scanner-top button{background:rgba(255,255,255,0.12); border:none; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px;}
+  .scanner-hint{position:absolute; bottom:30px; left:0; right:0; text-align:center; color:#fff; font-size:13px; opacity:0.85; padding:0 30px;}
+  .scanner-status{position:absolute; bottom:80px; left:0; right:0; text-align:center; color:var(--accent); font-size:13px; font-weight:600;}
+
+  /* ---- sheet / modal ---- */
+  .sheet-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:90; display:flex; align-items:flex-end;}
+  .sheet{background:var(--panel); border-radius:20px 20px 0 0; padding:22px 20px 28px; width:100%; max-width:520px; margin:0 auto; border:1px solid var(--border); border-bottom:none; max-height:88vh; overflow-y:auto;}
+  .sheet h3{margin:0 0 4px; font-size:17px;}
+  .sheet .hint{color:var(--sub); font-size:13px; margin-bottom:16px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; color:var(--sub); margin-bottom:6px; font-weight:600;}
+  .field input{
+    width:100%; padding:13px 14px; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:16px;
+  }
+  .field input:focus{outline:none; border-color:var(--accent);}
+  .field .static{padding:13px 14px; background:var(--panel2); border-radius:10px; border:1px solid var(--border); font-size:15px;}
+  .btnrow{display:flex; gap:10px; margin-top:18px;}
+  .btn{flex:1; padding:14px; border-radius:10px; border:none; font-size:15px; font-weight:700;}
+  .btn.primary{background:var(--accent); color:#06201d;}
+  .btn.primary:disabled{opacity:0.4;}
+  .btn.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--border);}
+  .btn.danger{background:rgba(239,92,92,0.12); color:var(--danger); border:1px solid rgba(239,92,92,0.3);}
+
+  /* ---- catalog search/pick ---- */
+  .catsearch{position:relative; margin-bottom:10px;}
+  .catresults{max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; background:var(--panel2);}
+  .catitem{padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer;}
+  .catitem:last-child{border-bottom:none;}
+  .catitem:active{background:rgba(79,209,197,0.1);}
+  .catitem .ctitle{font-size:14px; font-weight:600;}
+  .catitem .cid{font-size:11px; color:var(--sub); margin-top:2px;}
+  .catpicked{
+    background:rgba(79,209,197,0.1); border:1px solid var(--accent); border-radius:10px; padding:13px 14px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .catpicked .changebtn{color:var(--accent); font-size:12px; font-weight:700; background:none; border:none; flex-shrink:0;}
+
+  .toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--accent); color:#06201d;
+    padding:12px 22px; border-radius:30px; font-size:14px; font-weight:700; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    animation:toastIn 0.2s ease;
+  }
+  @keyframes toastIn{from{opacity:0; transform:translate(-50%,10px);} to{opacity:1; transform:translate(-50%,0);}}
+
+  footer{
+    position:fixed; bottom:0; left:0; right:0; max-width:520px; margin:0 auto;
+    background:rgba(10,12,16,0.95); backdrop-filter:blur(10px); border-top:1px solid var(--border);
+    padding:12px 16px; display:flex; gap:10px;
+  }
+  footer button{flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-size:13px; font-weight:600;}
+  footer button.exportbtn{color:var(--accent); border-color:var(--accent);}
+
+  .loading{display:flex; align-items:center; justify-content:center; gap:8px; color:var(--sub); padding:30px; font-size:13px;}
+  .spinner{width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .errscreen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; text-align:center;}
+  .errscreen h2{margin-bottom:6px; color:var(--danger);}
+  .errscreen p{color:var(--sub); font-size:13px; max-width:380px;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="loading"><div class="spinner"></div> Loading…</div>
+</div>
+
+<script>
+/* ======================= CONFIG ======================= */
+// Pre-configured for Dr. Baydon's Supabase project.
+const SUPABASE_URL = 'https://ythuumovzyrposucuvpv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0aHV1bW92enlycG9zdWN1dnB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDQxMDksImV4cCI6MjA5Nzk4MDEwOX0.PvX8jaYGu66g6sXjslVJ5CAiS_x7vsSLBzBnKjvy9Uo';
+
+let sb = null;
+let currentStaff = null;
+let pendingPin = '';
+let activeTab = 'scan';
+let codeReader = null;
+let lastScanTime = 0;
+let pickedCatalogItem = null; // {product_id, product_title} chosen during "new product" flow
+
+const EXPIRY_WARN_DAYS = 90;
+
+/* ======================= INIT ======================= */
+async function boot(){
+  try{
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // quick connectivity check
+    const { error } = await sb.from('staff').select('id').limit(1);
+    if(error) throw error;
+  }catch(e){
+    console.error(e);
+    renderErrorScreen(e.message || 'Could not connect to the database.');
+    return;
+  }
+  currentStaff = JSON.parse(sessionStorage.getItem('sc_staff') || 'null');
+  if(currentStaff){
+    renderMain();
+  } else {
+    renderPinScreen();
+  }
+}
+function renderErrorScreen(msg){
+  document.getElementById('app').innerHTML = `
+    <div class="errscreen">
+      <h2>⚠️ Connection error</h2>
+      <p>${escapeHtml(msg)}</p>
+      <p style="margin-top:14px;">Check that setup.sql and catalog_import.sql have both been run in your Supabase project.</p>
+    </div>`;
+}
+
+/* ======================= PIN LOGIN ======================= */
+function renderPinScreen(){
+  pendingPin = '';
+  document.getElementById('app').innerHTML = `
+    <div class="pinscreen">
+      <h2>🔒 Enter your PIN</h2>
+      <p>ScanCount — Pharmacy Inventory</p>
+      <div class="pinerr" id="pinerr"></div>
+      <div class="pindots" id="pindots">
+        ${[0,1,2,3].map(()=>'<div class="pd"></div>').join('')}
+      </div>
+      <div class="keypad">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinPress('${n}')">${n}</button>`).join('')}
+        <button class="ghost"></button>
+        <button onclick="pinPress('0')">0</button>
+        <button onclick="pinBackspace()">⌫</button>
+      </div>
+    </div>`;
+}
+function updatePinDots(){
+  const dots = document.querySelectorAll('#pindots .pd');
+  dots.forEach((d,i)=> d.classList.toggle('filled', i < pendingPin.length));
+}
+async function pinPress(d){
+  if(pendingPin.length >= 4) return;
+  pendingPin += d;
+  updatePinDots();
+  if(pendingPin.length === 4) await tryPinLogin();
+}
+function pinBackspace(){
+  pendingPin = pendingPin.slice(0,-1);
+  updatePinDots();
+  document.getElementById('pinerr').textContent = '';
+}
+async function tryPinLogin(){
+  const { data, error } = await sb.from('staff').select('*').eq('pin', pendingPin).maybeSingle();
+  if(error || !data){
+    document.getElementById('pinerr').textContent = 'Incorrect PIN';
+    pendingPin = '';
+    updatePinDots();
+    return;
+  }
+  currentStaff = { id: data.id, name: data.name };
+  sessionStorage.setItem('sc_staff', JSON.stringify(currentStaff));
+  renderMain();
+}
+function logout(){
+  sessionStorage.removeItem('sc_staff');
+  currentStaff = null;
+  renderPinScreen();
+}
+
+/* ======================= MAIN UI ======================= */
+function renderMain(){
+  document.getElementById('app').innerHTML = `
+    <header>
+      <h1>Scan<span>Count</span></h1>
+      <div class="staffchip" onclick="logout()"><span class="dot"></span> ${escapeHtml(currentStaff.name)} ▾</div>
+    </header>
+    <div class="tabs">
+      <div class="tab ${activeTab==='scan'?'active':''}" onclick="switchTab('scan')">Scan</div>
+      <div class="tab ${activeTab==='list'?'active':''}" onclick="switchTab('list')">Live List</div>
+    </div>
+    <main id="main"></main>
+    <footer>
+      <button onclick="confirmClearAll()">🗑 Clear All</button>
+      <button class="exportbtn" onclick="exportCSV()">⬇ Export CSV</button>
+    </footer>
+  `;
+  renderTabContent();
+}
+function switchTab(tab){ activeTab = tab; renderMain(); }
+
+async function renderTabContent(){
+  const main = document.getElementById('main');
+  if(activeTab === 'scan'){
+    main.innerHTML = `
+      <button class="scanbtn" onclick="openScanner()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg>
+        Scan Medicine Code
+      </button>
+      <div id="recentWrap"></div>
+    `;
+    renderRecentScans();
+  } else {
+    main.innerHTML = `
+      <input class="searchbar" id="searchbox" placeholder="Search medicine name…" oninput="renderLiveList()">
+      <div id="liveListWrap"><div class="loading"><div class="spinner"></div> Loading counts…</div></div>
+    `;
+    renderLiveList();
+  }
+}
+
+async function renderRecentScans(){
+  const { data, error } = await sb.from('stock_counts').select('*').order('scanned_at', { ascending:false }).limit(5);
+  const wrap = document.getElementById('recentWrap');
+  if(!wrap) return;
+  if(error){ wrap.innerHTML = `<div class="empty">Could not load recent scans.</div>`; return; }
+  if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">No scans yet today. Tap above to start.</div>`; return; }
+  wrap.innerHTML = `<div style="color:var(--sub); font-size:12px; margin:6px 0 8px; font-weight:600;">RECENT SCANS</div>` +
+    data.map(entryCard).join('');
+}
+
+async function renderLiveList(){
+  const wrap = document.getElementById('liveListWrap');
+  if(!wrap) return;
+  const search = (document.getElementById('searchbox')?.value || '').toLowerCase();
+  const { data, error } = await sb.from('stock_counts').select('*');
+  if(error){ wrap.innerHTML = `<div class="empty">Could not load list.</div>`; return; }
+  if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">Nothing counted yet.</div>`; return; }
+
+  const grouped = {};
+  data.forEach(row=>{
+    const key = row.product_id;
+    if(!grouped[key]) grouped[key] = { product_id:row.product_id, name:row.product_title, qty:0, earliestExpiry:null, count:0 };
+    grouped[key].qty += Number(row.quantity);
+    grouped[key].count += 1;
+    if(row.expiry_date){
+      if(!grouped[key].earliestExpiry || row.expiry_date < grouped[key].earliestExpiry){
+        grouped[key].earliestExpiry = row.expiry_date;
+      }
+    }
+  });
+  let rows = Object.values(grouped);
+  if(search) rows = rows.filter(r=>r.name.toLowerCase().includes(search));
+  rows.sort((a,b)=>a.name.localeCompare(b.name));
+
+  if(rows.length===0){ wrap.innerHTML = `<div class="empty">No matches.</div>`; return; }
+
+  wrap.innerHTML = rows.map(r=>{
+    const expInfo = expiryBadge(r.earliestExpiry);
+    return `
+      <div class="card">
+        <div class="row">
+          <div>
+            <div class="medname">${escapeHtml(r.name)}</div>
+            <div class="pid">ID ${r.product_id}</div>
+            <div class="meta">
+              <span>${r.count} scan${r.count>1?'s':''}</span>
+              ${expInfo ? `<span class="exp ${expInfo.cls}">${expInfo.label}</span>` : ''}
+            </div>
+          </div>
+          <div class="qty">${r.qty}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function entryCard(row){
+  const expInfo = expiryBadge(row.expiry_date);
+  return `
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="medname">${escapeHtml(row.product_title)}</div>
+          <div class="pid">ID ${row.product_id}</div>
+          <div class="meta">
+            <span>by ${escapeHtml(row.scanned_by)}</span>
+            ${row.batch_number ? `<span>batch ${escapeHtml(row.batch_number)}</span>` : ''}
+            ${expInfo ? `<span class="exp ${expInfo.cls}">${expInfo.label}</span>` : ''}
+          </div>
+        </div>
+        <div class="qty">${row.quantity}</div>
+      </div>
+    </div>`;
+}
+
+function expiryBadge(dateStr){
+  if(!dateStr) return null;
+  const exp = new Date(dateStr);
+  const now = new Date();
+  const days = Math.floor((exp - now) / 86400000);
+  if(days < 0) return { label:`Expired ${dateStr}`, cls:'expired' };
+  if(days <= EXPIRY_WARN_DAYS) return { label:`Exp ${dateStr} (${days}d)`, cls:'soon' };
+  return { label:`Exp ${dateStr}`, cls:'' };
+}
+
+/* ======================= SCANNER ======================= */
+function openScanner(){
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="scanner" id="scannerOverlay">
+      <div class="scanner-top">
+        <button onclick="closeScanner()">✕ Close</button>
+        <div></div>
+      </div>
+      <video id="scanVideo" autoplay muted playsinline></video>
+      <div class="scanner-frame"></div>
+      <div class="scanner-status" id="scanStatus"></div>
+      <div class="scanner-hint">Point camera at the medicine box's 2D barcode</div>
+    </div>
+  `);
+  startScanning();
+}
+function closeScanner(){
+  if(codeReader){ try{ codeReader.reset(); }catch(e){} }
+  const overlay = document.getElementById('scannerOverlay');
+  if(overlay) overlay.remove();
+}
+async function startScanning(){
+  const statusEl = document.getElementById('scanStatus');
+  try{
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.DATA_MATRIX,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.EAN_13
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length-1];
+    const deviceId = backCam ? backCam.deviceId : undefined;
+
+    codeReader.decodeFromVideoDevice(deviceId, 'scanVideo', (result, err) => {
+      if(result){
+        const now = Date.now();
+        if(now - lastScanTime < 1500) return;
+        lastScanTime = now;
+        handleScanResult(result.getText());
+      }
+    });
+  }catch(e){
+    console.error(e);
+    if(statusEl) statusEl.textContent = 'Camera error — check permissions';
+  }
+}
+
+/* ======================= GS1 PARSING ======================= */
+function parseGS1(raw){
+  const GS = String.fromCharCode(29);
+  let s = raw.replace(/^\]d2/,'').replace(/^\]C1/,'').replace(/#/g, GS); // handle literal '#' as group separator too
+  const result = { gtin:null, expiry:null, batch:null, serial:null };
+  let i = 0;
+  while(i < s.length){
+    const ai = s.substr(i,2);
+    if(ai === '01' && s.length - i >= 16){
+      result.gtin = s.substr(i+2,14);
+      i += 16;
+    } else if(ai === '17' && s.length - i >= 8){
+      result.expiry = gs1DateToISO(s.substr(i+2,6));
+      i += 8;
+    } else if(ai === '21'){
+      let j = i+2, end = s.indexOf(GS, j);
+      if(end === -1) end = s.length;
+      result.serial = s.substring(j, end);
+      i = (end < s.length) ? end+1 : end;
+    } else if(ai === '10'){
+      let j = i+2, end = s.indexOf(GS, j);
+      if(end === -1) end = s.length;
+      result.batch = s.substring(j, end);
+      i = (end < s.length) ? end+1 : end;
+    } else {
+      i++;
+    }
+  }
+  return result;
+}
+function gs1DateToISO(ymd){
+  if(!/^\d{6}$/.test(ymd)) return null;
+  let yy = parseInt(ymd.substr(0,2),10);
+  const mm = ymd.substr(2,2);
+  let dd = ymd.substr(4,2);
+  const year = yy <= 50 ? 2000+yy : 1900+yy;
+  if(dd === '00') dd = '01';
+  return `${year}-${mm}-${dd}`;
+}
+
+/* ======================= SCAN RESULT HANDLING ======================= */
+async function handleScanResult(rawText){
+  const parsed = parseGS1(rawText);
+  closeScanner();
+
+  if(!parsed.gtin){
+    parsed.gtin = rawText.trim();
+  }
+
+  // Look up existing GTIN -> product_id mapping, then fetch the catalog name separately (avoids relying on join syntax)
+  const { data: mapping } = await sb
+    .from('products')
+    .select('product_id')
+    .eq('gtin', parsed.gtin)
+    .maybeSingle();
+
+  if(mapping && mapping.product_id){
+    const { data: cat } = await sb
+      .from('catalog')
+      .select('product_id, product_title')
+      .eq('product_id', mapping.product_id)
+      .maybeSingle();
+    openEntrySheet(parsed, cat ? { product_id: cat.product_id, product_title: cat.product_title } : null);
+  } else {
+    openEntrySheet(parsed, null);
+  }
+}
+
+/* ======================= ENTRY SHEET ======================= */
+function openEntrySheet(parsed, knownProduct){
+  pickedCatalogItem = knownProduct;
+  const isNew = !knownProduct;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="sheet-backdrop" id="entrySheet">
+      <div class="sheet">
+        <h3>${isNew ? '🆕 New product' : '✅ Recognized'}</h3>
+        <div class="hint">${isNew ? 'First scan of this code — find it in your catalog once.' : 'Confirm quantity and save.'}</div>
+
+        <div class="field">
+          <label>Medicine</label>
+          <div id="productPickWrap"></div>
+        </div>
+
+        <div class="field">
+          <label>Quantity Counted</label>
+          <input id="f_qty" type="number" inputmode="numeric" placeholder="0">
+        </div>
+
+        <div class="field">
+          <label>Expiry Date</label>
+          <input id="f_expiry" type="date" value="${parsed.expiry || ''}">
+        </div>
+
+        <div class="field">
+          <label>Batch Number</label>
+          <input id="f_batch" value="${escapeHtml(parsed.batch || '')}" placeholder="(optional)">
+        </div>
+
+        <div class="btnrow">
+          <button class="btn secondary" onclick="closeEntrySheet()">Cancel</button>
+          <button class="btn primary" id="saveBtn" onclick="saveEntry('${escapeAttr(parsed.gtin)}')" ${isNew?'disabled':''}>Save</button>
+        </div>
+      </div>
+    </div>
+  `);
+  renderProductPickWrap();
+  setTimeout(()=>{ if(!isNew) document.getElementById('f_qty')?.focus(); }, 100);
+}
+function renderProductPickWrap(){
+  const wrap = document.getElementById('productPickWrap');
+  if(pickedCatalogItem){
+    wrap.innerHTML = `
+      <div class="catpicked">
+        <div>
+          <div class="medname">${escapeHtml(pickedCatalogItem.product_title)}</div>
+          <div class="pid">ID ${pickedCatalogItem.product_id}</div>
+        </div>
+        <button class="changebtn" onclick="openCatalogSearch()">Change</button>
+      </div>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="catsearch">
+        <input class="searchbar" id="catSearchInput" placeholder="Type medicine name to search…" oninput="runCatalogSearch()" style="margin-bottom:8px;">
+        <div class="catresults" id="catResults"></div>
+      </div>`;
+    setTimeout(()=>document.getElementById('catSearchInput')?.focus(), 100);
+  }
+}
+function openCatalogSearch(){
+  pickedCatalogItem = null;
+  renderProductPickWrap();
+  document.getElementById('saveBtn').disabled = true;
+}
+let catSearchDebounce = null;
+function runCatalogSearch(){
+  clearTimeout(catSearchDebounce);
+  catSearchDebounce = setTimeout(async ()=>{
+    const q = document.getElementById('catSearchInput').value.trim();
+    const resultsEl = document.getElementById('catResults');
+    if(!resultsEl) return;
+    if(q.length < 2){ resultsEl.innerHTML = ''; return; }
+    resultsEl.innerHTML = `<div class="loading"><div class="spinner"></div> Searching…</div>`;
+    const { data, error } = await sb
+      .from('catalog')
+      .select('product_id, product_title')
+      .ilike('product_title', `%${q}%`)
+      .order('product_title')
+      .limit(20);
+    if(error){ resultsEl.innerHTML = `<div class="empty">Search error.</div>`; return; }
+    if(!data || data.length===0){ resultsEl.innerHTML = `<div class="empty">No matches in catalog.</div>`; return; }
+    resultsEl.innerHTML = data.map(p => `
+      <div class="catitem" onclick='pickCatalogItem(${p.product_id}, ${JSON.stringify(p.product_title)})'>
+        <div class="ctitle">${escapeHtml(p.product_title)}</div>
+        <div class="cid">ID ${p.product_id}</div>
+      </div>
+    `).join('');
+  }, 250);
+}
+function pickCatalogItem(productId, productTitle){
+  pickedCatalogItem = { product_id: productId, product_title: productTitle };
+  renderProductPickWrap();
+  document.getElementById('saveBtn').disabled = false;
+  setTimeout(()=>document.getElementById('f_qty')?.focus(), 100);
+}
+function closeEntrySheet(){
+  const el = document.getElementById('entrySheet');
+  if(el) el.remove();
+  pickedCatalogItem = null;
+}
+async function saveEntry(gtin){
+  const qty = document.getElementById('f_qty').value;
+  const expiry = document.getElementById('f_expiry').value || null;
+  const batch = document.getElementById('f_batch').value.trim() || null;
+
+  if(!qty || isNaN(qty)){ alert('Please enter a valid quantity'); return; }
+  if(!pickedCatalogItem){ alert('Please pick the medicine from the catalog'); return; }
+
+  // Save GTIN -> catalog mapping if this is a new GTIN
+  await sb.from('products').upsert({
+    gtin, product_id: pickedCatalogItem.product_id, created_by: currentStaff.name
+  }, { onConflict: 'gtin', ignoreDuplicates: true });
+
+  await sb.from('stock_counts').insert({
+    gtin, product_id: pickedCatalogItem.product_id, product_title: pickedCatalogItem.product_title,
+    quantity: Number(qty), expiry_date: expiry, batch_number: batch, scanned_by: currentStaff.name
+  });
+
+  const name = pickedCatalogItem.product_title;
+  closeEntrySheet();
+  showToast(`Saved: ${name} × ${qty}`);
+  if(activeTab === 'scan') renderRecentScans();
+  if(activeTab === 'list') renderLiveList();
+}
+
+/* ======================= EXPORT / CLEAR ======================= */
+async function exportCSV(){
+  const { data } = await sb.from('stock_counts').select('*').order('product_title');
+  if(!data || data.length===0){ alert('Nothing to export yet.'); return; }
+  let csv = 'Product ID,Medicine,Quantity,Expiry,Batch,Scanned By,Scanned At\n';
+  data.forEach(r=>{
+    csv += [r.product_id, r.product_title, r.quantity, r.expiry_date||'', r.batch_number||'', r.scanned_by, r.scanned_at]
+      .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',') + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `stock_count_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function confirmClearAll(){
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="sheet-backdrop" id="clearSheet">
+      <div class="sheet">
+        <h3>⚠️ Clear all counts?</h3>
+        <div class="hint">This deletes every scanned entry in the current stock-take for everyone. The catalog and GTIN mappings are kept. This cannot be undone.</div>
+        <div class="btnrow">
+          <button class="btn secondary" onclick="document.getElementById('clearSheet').remove()">Cancel</button>
+          <button class="btn danger" onclick="doClearAll()">Delete All</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+async function doClearAll(){
+  await sb.from('stock_counts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  document.getElementById('clearSheet')?.remove();
+  showToast('All counts cleared');
+  renderTabContent();
+}
+
+/* ======================= UTIL ======================= */
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 1800);
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
+
+boot();
+</script>
+</body>
+</html>
