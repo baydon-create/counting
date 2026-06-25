@@ -393,12 +393,34 @@ function openScanner(){
 }
 function closeScanner(){
   if(codeReader){ try{ codeReader.reset(); }catch(e){} }
+  const videoEl = document.getElementById('scanVideo');
+  if(videoEl && videoEl.srcObject){
+    try{ videoEl.srcObject.getTracks().forEach(t => t.stop()); }catch(e){}
+    videoEl.srcObject = null;
+  }
   const overlay = document.getElementById('scannerOverlay');
   if(overlay) overlay.remove();
 }
 async function startScanning(){
   const statusEl = document.getElementById('scanStatus');
   try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      throw new Error('Camera API not available. Make sure you are using https:// and a modern browser.');
+    }
+
+    // iOS Safari quirk: enumerateDevices() can return blank/incomplete labels
+    // until a getUserMedia() stream has actually been granted at least once.
+    // So we request the back camera directly first, THEN hand the live stream to ZXing.
+    const constraints = {
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+    const videoEl = document.getElementById('scanVideo');
+    videoEl.srcObject = stream;
+    await videoEl.play();
+
     const hints = new Map();
     const formats = [
       ZXing.BarcodeFormat.DATA_MATRIX,
@@ -408,11 +430,9 @@ async function startScanning(){
     ];
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-    const backCam = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length-1];
-    const deviceId = backCam ? backCam.deviceId : undefined;
 
-    codeReader.decodeFromVideoDevice(deviceId, 'scanVideo', (result, err) => {
+    // Decode continuously from the already-live video element/stream
+    codeReader.decodeFromVideoElement(videoEl, (result, err) => {
       if(result){
         const now = Date.now();
         if(now - lastScanTime < 1500) return;
@@ -421,8 +441,8 @@ async function startScanning(){
       }
     });
   }catch(e){
-    console.error(e);
-    if(statusEl) statusEl.textContent = 'Camera error — check permissions';
+    console.error('Camera init error:', e);
+    if(statusEl) statusEl.textContent = `Camera error: ${e.name || ''} ${e.message || e}`;
   }
 }
 
