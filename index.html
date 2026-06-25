@@ -11,6 +11,7 @@
     --bg:#0a0c10; --panel:#12151b; --panel2:#171b22; --border:#232934;
     --text:#eef1f5; --sub:#8b94a3; --accent:#4fd1c5; --accent2:#38b8ac;
     --danger:#ef5c5c; --warn:#e8b84b; --radius:14px;
+    --content-max:520px; --content-max-desktop:1280px;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   body{
@@ -18,19 +19,32 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     min-height:100vh; padding-bottom:90px;
   }
-  .app{max-width:520px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+  .app{max-width:var(--content-max); margin:0 auto; min-height:100vh; display:flex; flex-direction:column;}
+
   header{
-    padding:18px 20px 14px; border-bottom:1px solid var(--border);
+    padding:14px 20px; border-bottom:1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between; position:sticky; top:0;
-    background:rgba(10,12,16,0.92); backdrop-filter:blur(10px); z-index:20;
+    background:rgba(10,12,16,0.96); backdrop-filter:blur(10px); z-index:30;
+    gap:12px;
   }
-  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:0.2px;}
+  .headerleft{display:flex; align-items:center; gap:10px; min-width:0;}
+  .hospitallogo{height:34px; width:auto; max-width:120px; object-fit:contain; flex-shrink:0; border-radius:4px;}
+  .headertitles{display:flex; flex-direction:column; min-width:0;}
+  header h1{font-size:16px; margin:0; font-weight:700; letter-spacing:0.2px; white-space:nowrap;}
   header h1 span{color:var(--accent);}
+  .hospitalname{font-size:10px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .headerright{display:flex; align-items:center; gap:8px; flex-shrink:0;}
   .staffchip{
     font-size:12px; color:var(--sub); background:var(--panel2); border:1px solid var(--border);
-    padding:5px 10px; border-radius:20px; display:flex; align-items:center; gap:6px; cursor:pointer;
+    padding:5px 10px; border-radius:20px; display:flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;
   }
-  .dot{width:7px; height:7px; border-radius:50%; background:var(--accent);}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--accent); flex-shrink:0;}
+
+  /* ---- sticky scan toolbar (sits right under header, scan button always reachable) ---- */
+  .scantoolbar{
+    position:sticky; top:62px; z-index:25; background:var(--bg);
+    padding:10px 16px; border-bottom:1px solid var(--border);
+  }
 
   /* ---- PIN screen ---- */
   .pinscreen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px;}
@@ -50,26 +64,29 @@
 
   /* ---- main views ---- */
   main{flex:1; padding:16px 16px 0;}
-  .tabs{display:flex; gap:8px; padding:0 16px 12px; position:sticky; top:64px; background:var(--bg); z-index:15;}
-  .tab{flex:1; text-align:center; padding:9px 0; border-radius:10px; font-size:13px; font-weight:600; color:var(--sub); border:1px solid var(--border); background:var(--panel2);}
+  .tabs{display:flex; gap:8px; padding:0 16px 12px; position:sticky; top:112px; background:var(--bg); z-index:24;}
+  .tab{flex:1; text-align:center; padding:9px 0; border-radius:10px; font-size:13px; font-weight:600; color:var(--sub); border:1px solid var(--border); background:var(--panel2); cursor:pointer;}
   .tab.active{color:#06201d; background:var(--accent); border-color:var(--accent);}
 
   .scanbtn{
     width:100%; padding:18px; border-radius:var(--radius); border:1px solid var(--accent);
     background:linear-gradient(180deg, rgba(79,209,197,0.16), rgba(79,209,197,0.05));
     color:var(--accent); font-size:16px; font-weight:700; display:flex; align-items:center;
-    justify-content:center; gap:10px; margin-bottom:16px;
+    justify-content:center; gap:10px; cursor:pointer;
   }
   .scanbtn svg{width:22px; height:22px;}
 
-  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px; margin-bottom:10px; cursor:pointer; transition:border-color 0.15s;}
+  .card:hover{border-color:var(--accent2);}
   .row{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
   .medname{font-weight:700; font-size:15px;}
   .pid{color:var(--sub); font-size:11px; font-weight:600; margin-top:2px;}
   .qty{font-size:20px; font-weight:800; color:var(--accent);}
-  .meta{color:var(--sub); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
+  .meta{color:var(--sub); font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
   .meta .exp.soon{color:var(--warn); font-weight:600;}
   .meta .exp.expired{color:var(--danger); font-weight:600;}
+  .editedbadge{font-size:10px; color:var(--accent); background:rgba(79,209,197,0.12); padding:2px 7px; border-radius:8px; font-weight:700;}
+  .duplicatebadge{font-size:10px; color:var(--warn); background:rgba(232,184,75,0.12); padding:2px 7px; border-radius:8px; font-weight:700;}
 
   .empty{text-align:center; color:var(--sub); padding:50px 20px; font-size:14px;}
   .searchbar{
@@ -77,6 +94,20 @@
     background:var(--panel2); color:var(--text); font-size:14px; margin-bottom:12px;
   }
   .searchbar::placeholder{color:#5a6372;}
+
+  .filterrow{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+  .filterchip{
+    font-size:12px; padding:6px 12px; border-radius:16px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--sub); cursor:pointer; font-weight:600; white-space:nowrap;
+  }
+  .filterchip.active{color:#06201d; background:var(--accent); border-color:var(--accent);}
+
+  .statsrow{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;}
+  .statbox{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; text-align:center;}
+  .statbox .num{font-size:20px; font-weight:800; color:var(--accent);}
+  .statbox.warn .num{color:var(--warn);}
+  .statbox.danger .num{color:var(--danger);}
+  .statbox .lbl{font-size:10px; color:var(--sub); text-transform:uppercase; font-weight:700; margin-top:2px;}
 
   /* ---- scanner overlay ---- */
   .scanner{position:fixed; inset:0; background:#000; z-index:100; display:flex; flex-direction:column;}
@@ -116,14 +147,14 @@
   .catresults{max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; background:var(--panel2);}
   .catitem{padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer;}
   .catitem:last-child{border-bottom:none;}
-  .catitem:active{background:rgba(79,209,197,0.1);}
+  .catitem:active, .catitem:hover{background:rgba(79,209,197,0.1);}
   .catitem .ctitle{font-size:14px; font-weight:600;}
   .catitem .cid{font-size:11px; color:var(--sub); margin-top:2px;}
   .catpicked{
     background:rgba(79,209,197,0.1); border:1px solid var(--accent); border-radius:10px; padding:13px 14px;
     display:flex; justify-content:space-between; align-items:center; gap:10px;
   }
-  .catpicked .changebtn{color:var(--accent); font-size:12px; font-weight:700; background:none; border:none; flex-shrink:0;}
+  .catpicked .changebtn{color:var(--accent); font-size:12px; font-weight:700; background:none; border:none; flex-shrink:0; cursor:pointer;}
 
   .toast{
     position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--accent); color:#06201d;
@@ -132,13 +163,18 @@
   }
   @keyframes toastIn{from{opacity:0; transform:translate(-50%,10px);} to{opacity:1; transform:translate(-50%,0);}}
 
-  footer{
-    position:fixed; bottom:0; left:0; right:0; max-width:520px; margin:0 auto;
+  .actionbar{
+    position:fixed; bottom:0; left:0; right:0; max-width:var(--content-max); margin:0 auto;
     background:rgba(10,12,16,0.95); backdrop-filter:blur(10px); border-top:1px solid var(--border);
-    padding:12px 16px; display:flex; gap:10px;
+    padding:12px 16px; display:flex; gap:10px; z-index:30;
   }
-  footer button{flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-size:13px; font-weight:600;}
-  footer button.exportbtn{color:var(--accent); border-color:var(--accent);}
+  .actionbar button{flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-size:13px; font-weight:600; cursor:pointer;}
+  .actionbar button.exportbtn{color:var(--accent); border-color:var(--accent);}
+
+  .copyrightfooter{
+    text-align:center; color:var(--sub); font-size:11px; padding:18px 16px 86px; line-height:1.6;
+  }
+  .copyrightfooter strong{color:#aab2c0; font-weight:600;}
 
   .loading{display:flex; align-items:center; justify-content:center; gap:8px; color:var(--sub); padding:30px; font-size:13px;}
   .spinner{width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite;}
@@ -147,7 +183,34 @@
   .errscreen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; text-align:center;}
   .errscreen h2{margin-bottom:6px; color:var(--danger);}
   .errscreen p{color:var(--sub); font-size:13px; max-width:380px;}
+
+  /* ---- edit modal extras ---- */
+  .historylist{margin-top:6px;}
+  .historyitem{padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; color:var(--sub);}
+  .historyitem:last-child{border-bottom:none;}
+  .historyitem strong{color:var(--text);}
+
+  /* ---- DESKTOP RESPONSIVE LAYOUT ---- */
+  @media (min-width: 900px){
+    :root{ --content-max:var(--content-max-desktop); }
+    body{ padding-bottom:0; }
+    .app{ padding:0 24px; }
+    header{ padding:16px 0; }
+    .scantoolbar{ top:66px; padding:14px 0; }
+    .tabs{ top:128px; padding:0 0 14px; max-width:340px; }
+    main{ padding:20px 0 40px; display:grid; grid-template-columns:340px 1fr; gap:24px; align-items:start; }
+    main.singlecol{ display:block; }
+    #main{ grid-column:1; }
+    .listgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(380px,1fr)); gap:12px; }
+    .listgrid .card{ margin-bottom:0; }
+    .statsrow{ grid-template-columns:repeat(3,1fr); max-width:600px; }
+    .actionbar{ position:static; max-width:none; background:transparent; backdrop-filter:none; border-top:none; padding:0; margin-top:20px; justify-content:flex-end; }
+    .actionbar button{ flex:none; padding:10px 20px; }
+    .copyrightfooter{ padding:24px 0; text-align:left; border-top:1px solid var(--border); margin-top:30px; }
+    .scanbtn{ padding:14px; }
+  }
 </style>
+
 </head>
 <body>
 <div class="app" id="app">
@@ -250,21 +313,43 @@ function logout(){
 }
 
 /* ======================= MAIN UI ======================= */
+const HOSPITAL_LOGO_URL = 'https://alahlimedical.com.sa/images/1775149380.png';
+const HOSPITAL_NAME = 'Al Ahli Medical';
+
 function renderMain(){
   document.getElementById('app').innerHTML = `
     <header>
-      <h1>Scan<span>Count</span></h1>
-      <div class="staffchip" onclick="logout()"><span class="dot"></span> ${escapeHtml(currentStaff.name)} ▾</div>
+      <div class="headerleft">
+        <img class="hospitallogo" src="${HOSPITAL_LOGO_URL}" alt="${escapeHtml(HOSPITAL_NAME)}" onerror="this.style.display='none'">
+        <div class="headertitles">
+          <h1>Scan<span>Count</span></h1>
+          <div class="hospitalname">${escapeHtml(HOSPITAL_NAME)}</div>
+        </div>
+      </div>
+      <div class="headerright">
+        <div class="staffchip" onclick="logout()"><span class="dot"></span> ${escapeHtml(currentStaff.name)} ▾</div>
+      </div>
     </header>
+    <div class="scantoolbar">
+      <button class="scanbtn" onclick="openScanner()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg>
+        Scan Medicine or Cosmetic Code
+      </button>
+    </div>
     <div class="tabs">
-      <div class="tab ${activeTab==='scan'?'active':''}" onclick="switchTab('scan')">Scan</div>
+      <div class="tab ${activeTab==='scan'?'active':''}" onclick="switchTab('scan')">Recent</div>
       <div class="tab ${activeTab==='list'?'active':''}" onclick="switchTab('list')">Live List</div>
+      <div class="tab ${activeTab==='activity'?'active':''}" onclick="switchTab('activity')">Activity</div>
     </div>
     <main id="main"></main>
-    <footer>
+    <div class="actionbar">
       <button onclick="confirmClearAll()">🗑 Clear All</button>
       <button class="exportbtn" onclick="exportCSV()">⬇ Export CSV</button>
-    </footer>
+    </div>
+    <div class="copyrightfooter">
+      © ${new Date().getFullYear()} ScanCount — Pharmacy Inventory System.<br>
+      Created by <strong>Dr. Mohamed Baydon</strong> &amp; <strong>Dr. Mahmoud Abdin</strong>.
+    </div>
   `;
   renderTabContent();
 }
@@ -273,31 +358,43 @@ function switchTab(tab){ activeTab = tab; renderMain(); }
 async function renderTabContent(){
   const main = document.getElementById('main');
   if(activeTab === 'scan'){
-    main.innerHTML = `
-      <button class="scanbtn" onclick="openScanner()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></svg>
-        Scan Medicine Code
-      </button>
-      <div id="recentWrap"></div>
-    `;
+    main.innerHTML = `<div id="recentWrap"></div>`;
     renderRecentScans();
-  } else {
+  } else if(activeTab === 'list'){
     main.innerHTML = `
-      <input class="searchbar" id="searchbox" placeholder="Search medicine name…" oninput="renderLiveList()">
+      <div class="statsrow" id="statsRow"></div>
+      <input class="searchbar" id="searchbox" placeholder="Search by name or product ID…" oninput="renderLiveList()">
+      <div class="filterrow">
+        <div class="filterchip active" data-filter="all" onclick="setListFilter('all')">All</div>
+        <div class="filterchip" data-filter="expiring" onclick="setListFilter('expiring')">⚠ Expiring Soon</div>
+        <div class="filterchip" data-filter="expired" onclick="setListFilter('expired')">⛔ Expired</div>
+        <div class="filterchip" data-filter="edited" onclick="setListFilter('edited')">✎ Edited</div>
+      </div>
       <div id="liveListWrap"><div class="loading"><div class="spinner"></div> Loading counts…</div></div>
     `;
     renderLiveList();
+  } else {
+    main.innerHTML = `<div id="activityWrap"><div class="loading"><div class="spinner"></div> Loading activity…</div></div>`;
+    renderActivity();
   }
 }
 
 async function renderRecentScans(){
-  const { data, error } = await sb.from('stock_counts').select('*').order('scanned_at', { ascending:false }).limit(5);
+  const { data, error } = await sb.from('stock_counts').select('*').order('scanned_at', { ascending:false }).limit(8);
   const wrap = document.getElementById('recentWrap');
   if(!wrap) return;
   if(error){ wrap.innerHTML = `<div class="empty">Could not load recent scans.</div>`; return; }
-  if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">No scans yet today. Tap above to start.</div>`; return; }
-  wrap.innerHTML = `<div style="color:var(--sub); font-size:12px; margin:6px 0 8px; font-weight:600;">RECENT SCANS</div>` +
-    data.map(entryCard).join('');
+  if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">No scans yet. Tap the scan button above to start.</div>`; return; }
+  const dupGtins = findDuplicateGtins(data);
+  wrap.innerHTML = `<div style="color:var(--sub); font-size:12px; margin:6px 0 8px; font-weight:600;">RECENT SCANS — tap any entry to edit</div>` +
+    data.map(row => entryCard(row, dupGtins.has(row.gtin))).join('');
+}
+
+let listFilter = 'all';
+function setListFilter(f){
+  listFilter = f;
+  document.querySelectorAll('.filterchip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+  renderLiveList();
 }
 
 async function renderLiveList(){
@@ -306,14 +403,17 @@ async function renderLiveList(){
   const search = (document.getElementById('searchbox')?.value || '').toLowerCase();
   const { data, error } = await sb.from('stock_counts').select('*');
   if(error){ wrap.innerHTML = `<div class="empty">Could not load list.</div>`; return; }
+  renderStatsRow(data || []);
   if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">Nothing counted yet.</div>`; return; }
 
   const grouped = {};
   data.forEach(row=>{
     const key = row.product_id;
-    if(!grouped[key]) grouped[key] = { product_id:row.product_id, name:row.product_title, qty:0, earliestExpiry:null, count:0 };
+    if(!grouped[key]) grouped[key] = { product_id:row.product_id, name:row.product_title, qty:0, earliestExpiry:null, count:0, anyEdited:false, rows:[] };
     grouped[key].qty += Number(row.quantity);
     grouped[key].count += 1;
+    grouped[key].rows.push(row);
+    if(row.edited_by) grouped[key].anyEdited = true;
     if(row.expiry_date){
       if(!grouped[key].earliestExpiry || row.expiry_date < grouped[key].earliestExpiry){
         grouped[key].earliestExpiry = row.expiry_date;
@@ -321,15 +421,26 @@ async function renderLiveList(){
     }
   });
   let rows = Object.values(grouped);
-  if(search) rows = rows.filter(r=>r.name.toLowerCase().includes(search));
+
+  if(listFilter === 'expiring'){
+    rows = rows.filter(r => { const b = expiryBadge(r.earliestExpiry); return b && b.cls === 'soon'; });
+  } else if(listFilter === 'expired'){
+    rows = rows.filter(r => { const b = expiryBadge(r.earliestExpiry); return b && b.cls === 'expired'; });
+  } else if(listFilter === 'edited'){
+    rows = rows.filter(r => r.anyEdited);
+  }
+
+  if(search) rows = rows.filter(r=> r.name.toLowerCase().includes(search) || String(r.product_id).includes(search));
   rows.sort((a,b)=>a.name.localeCompare(b.name));
 
-  if(rows.length===0){ wrap.innerHTML = `<div class="empty">No matches.</div>`; return; }
+  if(rows.length===0){ wrap.innerHTML = `<div class="empty">No matches for this filter.</div>`; return; }
 
-  wrap.innerHTML = rows.map(r=>{
+  wrap.innerHTML = `<div class="listgrid">` + rows.map(r=>{
     const expInfo = expiryBadge(r.earliestExpiry);
+    // Grouped card opens an edit picker if there's only one underlying row, otherwise opens the most recent for editing
+    const editTarget = r.rows.length === 1 ? r.rows[0].id : r.rows.sort((a,b)=>new Date(b.scanned_at)-new Date(a.scanned_at))[0].id;
     return `
-      <div class="card">
+      <div class="card" onclick="openEditSheet('${editTarget}')">
         <div class="row">
           <div>
             <div class="medname">${escapeHtml(r.name)}</div>
@@ -337,18 +448,54 @@ async function renderLiveList(){
             <div class="meta">
               <span>${r.count} scan${r.count>1?'s':''}</span>
               ${expInfo ? `<span class="exp ${expInfo.cls}">${expInfo.label}</span>` : ''}
+              ${r.anyEdited ? `<span class="editedbadge">EDITED</span>` : ''}
             </div>
           </div>
           <div class="qty">${r.qty}</div>
         </div>
       </div>`;
-  }).join('');
+  }).join('') + `</div>`;
 }
 
-function entryCard(row){
+function renderStatsRow(data){
+  const statsEl = document.getElementById('statsRow');
+  if(!statsEl) return;
+  const totalItems = data.length;
+  const totalQty = data.reduce((sum,r)=>sum+Number(r.quantity),0);
+  let expiringSoon = 0, expired = 0;
+  data.forEach(r=>{
+    const b = expiryBadge(r.expiry_date);
+    if(b?.cls === 'soon') expiringSoon++;
+    if(b?.cls === 'expired') expired++;
+  });
+  statsEl.innerHTML = `
+    <div class="statbox"><div class="num">${totalQty}</div><div class="lbl">Total Units</div></div>
+    <div class="statbox warn"><div class="num">${expiringSoon}</div><div class="lbl">Expiring Soon</div></div>
+    <div class="statbox danger"><div class="num">${expired}</div><div class="lbl">Expired</div></div>
+  `;
+}
+
+// Flags GTINs scanned more than once within a 10-minute window — a common accidental double-count
+// during a team stock-take when two staff members scan the same box without realizing.
+function findDuplicateGtins(rows){
+  const byGtin = {};
+  rows.forEach(r => { (byGtin[r.gtin] = byGtin[r.gtin] || []).push(r); });
+  const dups = new Set();
+  Object.values(byGtin).forEach(group=>{
+    if(group.length < 2) return;
+    const sorted = group.slice().sort((a,b)=> new Date(a.scanned_at) - new Date(b.scanned_at));
+    for(let i=1; i<sorted.length; i++){
+      const gap = new Date(sorted[i].scanned_at) - new Date(sorted[i-1].scanned_at);
+      if(gap < 10*60*1000){ dups.add(sorted[i].gtin); break; }
+    }
+  });
+  return dups;
+}
+
+function entryCard(row, isDuplicate){
   const expInfo = expiryBadge(row.expiry_date);
   return `
-    <div class="card">
+    <div class="card" onclick="openEditSheet('${row.id}')">
       <div class="row">
         <div>
           <div class="medname">${escapeHtml(row.product_title)}</div>
@@ -357,6 +504,8 @@ function entryCard(row){
             <span>by ${escapeHtml(row.scanned_by)}</span>
             ${row.batch_number ? `<span>batch ${escapeHtml(row.batch_number)}</span>` : ''}
             ${expInfo ? `<span class="exp ${expInfo.cls}">${expInfo.label}</span>` : ''}
+            ${row.edited_by ? `<span class="editedbadge">EDITED</span>` : ''}
+            ${isDuplicate ? `<span class="duplicatebadge">⚠ POSSIBLE DUPLICATE</span>` : ''}
           </div>
         </div>
         <div class="qty">${row.quantity}</div>
@@ -372,6 +521,166 @@ function expiryBadge(dateStr){
   if(days < 0) return { label:`Expired ${dateStr}`, cls:'expired' };
   if(days <= EXPIRY_WARN_DAYS) return { label:`Exp ${dateStr} (${days}d)`, cls:'soon' };
   return { label:`Exp ${dateStr}`, cls:'' };
+}
+
+/* ======================= ACTIVITY TAB (per-staff summary) ======================= */
+async function renderActivity(){
+  const wrap = document.getElementById('activityWrap');
+  if(!wrap) return;
+  const { data, error } = await sb.from('stock_counts').select('scanned_by, quantity, scanned_at, edited_by');
+  if(error){ wrap.innerHTML = `<div class="empty">Could not load activity.</div>`; return; }
+  if(!data || data.length===0){ wrap.innerHTML = `<div class="empty">No activity yet.</div>`; return; }
+
+  const byStaff = {};
+  data.forEach(r=>{
+    const key = r.scanned_by;
+    if(!byStaff[key]) byStaff[key] = { name:key, scans:0, units:0, lastScan:null, edits:0 };
+    byStaff[key].scans += 1;
+    byStaff[key].units += Number(r.quantity);
+    if(!byStaff[key].lastScan || r.scanned_at > byStaff[key].lastScan) byStaff[key].lastScan = r.scanned_at;
+    if(r.edited_by === key) byStaff[key].edits += 1;
+  });
+  const staffRows = Object.values(byStaff).sort((a,b)=> b.scans - a.scans);
+
+  wrap.innerHTML = `<div class="listgrid">` + staffRows.map(s => `
+    <div class="card" style="cursor:default;">
+      <div class="row">
+        <div>
+          <div class="medname">${escapeHtml(s.name)}</div>
+          <div class="meta">
+            <span>${s.scans} scan${s.scans!==1?'s':''}</span>
+            <span>${s.units} units</span>
+            ${s.edits ? `<span>${s.edits} edit${s.edits!==1?'s':''}</span>` : ''}
+            <span>last: ${new Date(s.lastScan).toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('') + `</div>`;
+}
+
+/* ======================= EDIT SHEET (full edit + audit history) ======================= */
+async function openEditSheet(stockCountId){
+  const { data: row, error } = await sb.from('stock_counts').select('*').eq('id', stockCountId).maybeSingle();
+  if(error || !row){ showToast('Could not load this entry'); return; }
+
+  const { data: history } = await sb.from('stock_counts_history').select('*').eq('stock_count_id', stockCountId).order('changed_at', { ascending:false });
+
+  const isCosmeticRow = !row.expiry_date && !row.batch_number;
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="sheet-backdrop" id="editSheet">
+      <div class="sheet">
+        <h3>✎ Edit Entry</h3>
+        <div class="hint">${escapeHtml(row.product_title)} — ID ${row.product_id}</div>
+
+        <div class="field">
+          <label>Quantity</label>
+          <input id="e_qty" type="number" inputmode="numeric" value="${row.quantity}">
+        </div>
+
+        ${isCosmeticRow ? '' : `
+        <div class="field">
+          <label>Expiry Date</label>
+          <input id="e_expiry" type="date" value="${row.expiry_date || ''}">
+        </div>
+        <div class="field">
+          <label>Batch Number</label>
+          <input id="e_batch" value="${escapeHtml(row.batch_number || '')}" placeholder="(optional)">
+        </div>
+        `}
+
+        <div class="field">
+          <label>Originally scanned</label>
+          <div class="static">${escapeHtml(row.scanned_by)} — ${new Date(row.scanned_at).toLocaleString()}</div>
+        </div>
+
+        ${row.edited_by ? `
+        <div class="field">
+          <label>Last edited</label>
+          <div class="static">${escapeHtml(row.edited_by)} — ${new Date(row.edited_at).toLocaleString()}</div>
+        </div>` : ''}
+
+        ${history && history.length > 0 ? `
+        <div class="field">
+          <label>Edit history (${history.length})</label>
+          <div class="historylist">
+            ${history.map(h => `
+              <div class="historyitem">
+                <strong>${escapeHtml(h.changed_by)}</strong> changed it on ${new Date(h.changed_at).toLocaleString()} —
+                previously: qty ${h.previous_quantity}${h.previous_expiry_date ? `, exp ${h.previous_expiry_date}` : ''}${h.previous_batch_number ? `, batch ${escapeHtml(h.previous_batch_number)}` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>` : ''}
+
+        <div class="btnrow">
+          <button class="btn danger" onclick="confirmDeleteEntry('${row.id}')">Delete</button>
+          <button class="btn secondary" onclick="closeEditSheet()">Cancel</button>
+          <button class="btn primary" onclick="saveEditedEntry('${row.id}')">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+function closeEditSheet(){
+  document.getElementById('editSheet')?.remove();
+}
+async function saveEditedEntry(stockCountId){
+  const newQty = document.getElementById('e_qty').value;
+  const newExpiry = document.getElementById('e_expiry')?.value || null;
+  const newBatch = document.getElementById('e_batch')?.value.trim() || null;
+
+  if(!newQty || isNaN(newQty)){ alert('Please enter a valid quantity'); return; }
+
+  const { data: current } = await sb.from('stock_counts').select('*').eq('id', stockCountId).maybeSingle();
+  if(!current) return;
+
+  // Log the pre-edit snapshot to the audit trail before overwriting anything
+  await sb.from('stock_counts_history').insert({
+    stock_count_id: stockCountId,
+    previous_quantity: current.quantity,
+    previous_expiry_date: current.expiry_date,
+    previous_batch_number: current.batch_number,
+    changed_by: currentStaff.name
+  });
+
+  const updatePayload = {
+    quantity: Number(newQty),
+    edited_by: currentStaff.name,
+    edited_at: new Date().toISOString()
+  };
+  if(document.getElementById('e_expiry')){ updatePayload.expiry_date = newExpiry; }
+  if(document.getElementById('e_batch')){ updatePayload.batch_number = newBatch; }
+
+  await sb.from('stock_counts').update(updatePayload).eq('id', stockCountId);
+
+  closeEditSheet();
+  showToast('Entry updated');
+  if(activeTab === 'scan') renderRecentScans();
+  if(activeTab === 'list') renderLiveList();
+}
+function confirmDeleteEntry(stockCountId){
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="sheet-backdrop" id="deleteConfirmSheet">
+      <div class="sheet">
+        <h3>⚠️ Delete this entry?</h3>
+        <div class="hint">This removes this single scan from the count. This cannot be undone.</div>
+        <div class="btnrow">
+          <button class="btn secondary" onclick="document.getElementById('deleteConfirmSheet').remove()">Cancel</button>
+          <button class="btn danger" onclick="doDeleteEntry('${stockCountId}')">Delete</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+async function doDeleteEntry(stockCountId){
+  await sb.from('stock_counts').delete().eq('id', stockCountId);
+  document.getElementById('deleteConfirmSheet')?.remove();
+  closeEditSheet();
+  showToast('Entry deleted');
+  if(activeTab === 'scan') renderRecentScans();
+  if(activeTab === 'list') renderLiveList();
 }
 
 /* ======================= SCANNER (Dynamsoft Barcode Reader) ======================= */
@@ -666,9 +975,9 @@ async function saveEntry(gtin){
 async function exportCSV(){
   const { data } = await sb.from('stock_counts').select('*').order('product_title');
   if(!data || data.length===0){ alert('Nothing to export yet.'); return; }
-  let csv = 'Product ID,Medicine,Quantity,Expiry,Batch,Scanned By,Scanned At\n';
+  let csv = 'Product ID,Medicine,Quantity,Expiry,Batch,Scanned By,Scanned At,Edited By,Edited At\n';
   data.forEach(r=>{
-    csv += [r.product_id, r.product_title, r.quantity, r.expiry_date||'', r.batch_number||'', r.scanned_by, r.scanned_at]
+    csv += [r.product_id, r.product_title, r.quantity, r.expiry_date||'', r.batch_number||'', r.scanned_by, r.scanned_at, r.edited_by||'', r.edited_at||'']
       .map(v => `"${String(v).replace(/"/g,'""')}"`).join(',') + '\n';
   });
   const blob = new Blob([csv], {type:'text/csv'});
