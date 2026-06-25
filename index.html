@@ -376,30 +376,47 @@ function expiryBadge(dateStr){
 }
 
 /* ======================= SCANNER ======================= */
+let scanLoopActive = false;
+let currentTrack = null;
+let torchOn = false;
+
 function openScanner(){
   document.body.insertAdjacentHTML('beforeend', `
     <div class="scanner" id="scannerOverlay">
       <div class="scanner-top">
         <button onclick="closeScanner()">✕ Close</button>
-        <div></div>
+        <button id="torchBtn" onclick="toggleTorch()" style="display:none;">💡 Light</button>
       </div>
       <video id="scanVideo" autoplay muted playsinline></video>
+      <canvas id="scanCanvas" style="display:none;"></canvas>
       <div class="scanner-frame"></div>
       <div class="scanner-status" id="scanStatus"></div>
-      <div class="scanner-hint">Point camera at the medicine box's 2D barcode</div>
+      <div class="scanner-hint">Hold steady, fill the box with the code, tap to focus</div>
     </div>
   `);
   startScanning();
 }
 function closeScanner(){
+  scanLoopActive = false;
   if(codeReader){ try{ codeReader.reset(); }catch(e){} }
   const videoEl = document.getElementById('scanVideo');
   if(videoEl && videoEl.srcObject){
     try{ videoEl.srcObject.getTracks().forEach(t => t.stop()); }catch(e){}
     videoEl.srcObject = null;
   }
+  currentTrack = null;
+  torchOn = false;
   const overlay = document.getElementById('scannerOverlay');
   if(overlay) overlay.remove();
+}
+async function toggleTorch(){
+  if(!currentTrack) return;
+  try{
+    torchOn = !torchOn;
+    await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
+  }catch(e){
+    console.error('Torch not supported:', e);
+  }
 }
 async function startScanning(){
   const statusEl = document.getElementById('scanStatus');
@@ -408,18 +425,34 @@ async function startScanning(){
       throw new Error('Camera API not available. Make sure you are using https:// and a modern browser.');
     }
 
-    // iOS Safari quirk: enumerateDevices() can return blank/incomplete labels
-    // until a getUserMedia() stream has actually been granted at least once.
-    // So we request the back camera directly first, THEN hand the live stream to ZXing.
+    // Request highest resolution back camera available — more pixels on the code = better decode odds.
     const constraints = {
-      video: { facingMode: { ideal: 'environment' } },
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }]
+      },
       audio: false
     };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    currentTrack = stream.getVideoTracks()[0];
+
+    // Show torch button if the device supports it (most back cameras do)
+    try{
+      const caps = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
+      if(caps.torch) document.getElementById('torchBtn').style.display = '';
+    }catch(e){}
 
     const videoEl = document.getElementById('scanVideo');
     videoEl.srcObject = stream;
     await videoEl.play();
+
+    // Tap-to-focus: iOS Safari doesn't expose manual focus control directly via JS reliably,
+    // but re-triggering continuous autofocus on tap helps it re-lock onto a close subject.
+    videoEl.addEventListener('click', async () => {
+      try{ await currentTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); }catch(e){}
+    });
 
     const hints = new Map();
     const formats = [
@@ -429,22 +462,71 @@ async function startScanning(){
       ZXing.BarcodeFormat.EAN_13
     ];
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
     codeReader = new ZXing.BrowserMultiFormatReader(hints);
 
-    // Decode continuously from the already-live video element/stream
-    codeReader.decodeFromVideoElement(videoEl, (result, err) => {
-      if(result){
-        const now = Date.now();
-        if(now - lastScanTime < 1500) return;
-        lastScanTime = now;
-        handleScanResult(result.getText());
-      }
-    });
+    scanLoopActive = true;
+    runCroppedScanLoop(videoEl);
   }catch(e){
     console.error('Camera init error:', e);
     if(statusEl) statusEl.textContent = `Camera error: ${e.name || ''} ${e.message || e}`;
   }
 }
+
+// Manually crop each frame to just the guide-box region, upscale it, and decode that —
+// concentrating pixels-per-module on the code itself instead of asking ZXing to find a
+// tiny dense DataMatrix inside a huge full-resolution frame. This is the single biggest
+// lever for reliability with small/dense codes on iOS Safari.
+async function runCroppedScanLoop(videoEl){
+  const canvas = document.getElementById('scanCanvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const UPSCALE = 2; // render the cropped region at 2x for more pixels per module
+  const DECODE_INTERVAL_MS = 200; // ~5 decode attempts/sec — enough to feel instant, cheap enough to avoid overhead
+  let lastDecodeAttempt = 0;
+
+  async function tick(timestamp){
+    if(!scanLoopActive) return;
+    if(timestamp - lastDecodeAttempt < DECODE_INTERVAL_MS){
+      requestAnimationFrame(tick);
+      return;
+    }
+    lastDecodeAttempt = timestamp;
+    try{
+      if(videoEl.videoWidth > 0){
+        // The guide box is 78% width, max 340px, centered, square (1:1 aspect) — match CSS.
+        const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+        const boxFraction = 0.78;
+        const boxSizeCss = Math.min(vw, vh) * boxFraction; // approximate, since video is object-fit:cover
+        const cropSize = Math.min(boxSizeCss, vw, vh);
+        const sx = (vw - cropSize) / 2;
+        const sy = (vh - cropSize) / 2;
+
+        canvas.width = cropSize * UPSCALE;
+        canvas.height = cropSize * UPSCALE;
+        ctx.drawImage(videoEl, sx, sy, cropSize, cropSize, 0, 0, canvas.width, canvas.height);
+
+        try{
+          const result = await codeReader.decodeFromCanvas(canvas);
+          if(result){
+            const now = Date.now();
+            if(now - lastScanTime > 1500){
+              lastScanTime = now;
+              handleScanResult(result.getText());
+              return; // stop loop, handleScanResult closes the scanner
+            }
+          }
+        }catch(decodeErr){
+          // NotFoundException is expected on every frame with no code in view — ignore silently.
+        }
+      }
+    }catch(e){
+      console.error('Scan loop error:', e);
+    }
+    if(scanLoopActive) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
 
 /* ======================= GS1 PARSING ======================= */
 function parseGS1(raw){
